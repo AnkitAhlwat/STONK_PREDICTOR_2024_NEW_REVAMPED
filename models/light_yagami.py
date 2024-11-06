@@ -27,9 +27,9 @@ class StockPredictor:
 
 # Example usage
 if __name__ == "__main__":
-    ticker_symbol = 'goog'
+    ticker_symbol = 'AMZN'
     stock_analyzer = StockAnalyzer()
-    stock_analyzer.fetch_history(ticker_symbol)
+    stock_analyzer.fetch_history(ticker_symbol,period='1mo',interval='30m')
     X, y = stock_analyzer.prepare_features()
 
     stock_predictor = StockPredictor()
