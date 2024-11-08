@@ -1,5 +1,9 @@
+from datetime import timedelta, datetime
+
 import numpy as np
+import pandas as pd
 import yfinance as yf
+import matplotlib.pyplot as plt
 
 
 class StockAnalyzer:
@@ -16,6 +20,69 @@ class StockAnalyzer:
         self.history_data['PE_Ratio'] = info.get('trailingPE', np.nan)  # Adding P/E ratio
 
         return self.history_data
+
+    def plot_stock_data(self, ticker_symbol):
+        """Plots the stock's closing price, 20-day SMA, and 50-day SMA."""
+        if self.history_data is None:
+            self.fetch_history(ticker_symbol)
+
+        # Ensure indicators are calculated before plotting
+        self.add_indicators()
+        # Plotting
+        plt.figure(figsize=(14, 7))
+
+        # Plot Closing Price
+        plt.plot(self.history_data.index, self.history_data['Close'], label='Closing Price', color='blue')
+
+        # Plot 20-day and 50-day SMAs
+        plt.plot(self.history_data.index, self.history_data['SMA_20'], label='20-day SMA', color='red', linestyle='--')
+        plt.plot(self.history_data.index, self.history_data['SMA_50'], label='50-day SMA', color='green',
+                 linestyle='--')
+
+        # Customize the plot
+        plt.title(f"{ticker_symbol} Stock Price")
+        plt.xlabel("Date")
+        plt.ylabel("Price (USD)")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def fetch_minute_data(self, ticker_symbol, start_date, end_date):
+        """Fetches historical 1-minute interval data over a period, handling Yahoo Finance's 7-day limit."""
+        all_data = []
+        current_start = start_date
+
+        while current_start < end_date:
+            current_end = min(current_start + timedelta(days=7), end_date)
+            print(f"Downloading data from {current_start} to {current_end}")
+            data = yf.download(
+                ticker_symbol,
+                start=current_start.strftime('%Y-%m-%d'),
+                end=current_end.strftime('%Y-%m-%d'),
+                interval='1m'
+            )
+            all_data.append(data)
+            current_start = current_end
+
+        # Concatenate all dataframes
+        full_data = pd.concat(all_data)
+        full_data = full_data[~full_data.index.duplicated(keep='first')]
+        self.history_data = full_data  # Store in the instance for further analysis
+        self.history_data.columns = [col[0] for col in analyzer.history_data.columns]
+
+        return full_data
+
+    def add_indicators(self):
+        """Adds commonly used indicators like SMA and RSI to the data."""
+        if self.history_data is None:
+            raise ValueError("Historical data not available. Fetch data first.")
+
+        # Add SMA indicators
+        self.calculate_moving_average(window=20)
+        self.calculate_moving_average(window=50)
+
+        # Add RSI indicator
+        self.calculate_rsi(window=14)
 
     @staticmethod
     def get_summary_info(ticker_symbol):
@@ -145,12 +212,28 @@ class StockAnalyzer:
 if __name__ == "__main__":
     symbol = 'GOOG'  # Example stock ticker
     analyzer = StockAnalyzer()
-    print(analyzer.get_day_range(symbol))
-    print(analyzer.get_52_week_range(symbol))
-    print(analyzer.get_pe_ratios(symbol))
-    print(analyzer.get_volume_info(symbol))
-    print(analyzer.get_market_cap(symbol))
-    print(analyzer.get_dividend_dates(symbol))
-    print(analyzer.get_income_statement_info(symbol))
-    print(analyzer.get_balance_sheet_info(symbol))
-    print(analyzer.get_free_cash_flow(symbol))
+    # Fetching minute data for the last 30 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    analyzer.fetch_minute_data(symbol, start_date, end_date)
+
+    # Add indicators
+    analyzer.add_indicators()
+
+    # Save minute data to an Excel file for record-keeping
+    analyzer.history_data.to_csv(f"{symbol}_minute_data.csv")
+    print(f"Data saved to {symbol}_minute_data.csv")
+
+    # Plot the data if needed
+    analyzer.plot_stock_data(symbol)
+
+    # Test functions
+    # # print(analyzer.get_day_range(symbol))
+    # # print(analyzer.get_52_week_range(symbol))
+    # # print(analyzer.get_pe_ratios(symbol))
+    # # print(analyzer.get_volume_info(symbol))
+    # # print(analyzer.get_market_cap(symbol))
+    # # print(analyzer.get_dividend_dates(symbol))
+    # # print(analyzer.get_income_statement_info(symbol))
+    # # print(analyzer.get_balance_sheet_info(symbol))
+    # # print(analyzer.get_free_cash_flow(symbol))
